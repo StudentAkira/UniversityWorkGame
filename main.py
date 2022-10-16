@@ -32,6 +32,7 @@ class Player:
         self.up_pressed = False
         self.down_pressed = False
         self.speed = 1
+        self.scaled = False
 
 
     def save_data(self):
@@ -66,15 +67,15 @@ class Player:
         print(" Money :: ", self.money)
         print(" Inventory :: ", self.inventory)
 
-    def hide(self):
-        pygame.draw.rect(screen, (90, 90, 90), (self.x-self.size[0]/2,
-                                                self.y-self.size[1]/2,
-                                                100,
-                                                100))
+    def hide(self, prev_x, prev_y):
+        pygame.draw.rect(screen, (90, 90, 90), (prev_x-self.size[0]/2,
+                                                prev_y-self.size[1]/2,
+                                                self.size[0],
+                                                self.size[1]))
 
     def draw(self, win):
         if world.focused:
-            self.hide()
+            world.draw()
             screen.blit(self.img, self.rect)
 
     def update(self):
@@ -91,15 +92,36 @@ class Player:
             if self.down_pressed and not self.up_pressed:
                 self.velY = self.speed
 
+            prev_x = self.x
+            prev_y = self.y
+
+            self.hide(prev_x, prev_y)
+
             self.x += self.velX
             self.y += self.velY
 
-            self.rect = pygame.Rect(int(self.x), int(self.y), 32, 32)
+            if self.x > world.w : self.x = 0
+            if self.x < 0 : self.x = world.w-1
+            if self.y > world.h : self.y = 0
+            if self.y < 0 : self.y = world.h-1
+
+            self.rect = self.img.get_rect(
+                center=(self.x, self.y)
+            )
+
+            if self.x-prev_x > 0 and not self.scaled:
+                player.img = pygame.transform.flip(player.img, True, False)
+                self.scaled = True
+
+            if self.x - prev_x < 0 and self.scaled:
+                player.img = pygame.transform.flip(player.img, True, False)
+                self.scaled = False
+                
             return
 
-        self.x = 0
-        self.y = 0
-
+        #spawn place
+        self.x = 200
+        self.y = 200
 
 
 class Charecter:
@@ -290,21 +312,22 @@ class Button:
 
 class World:
 
-    def __init__(self, w = 200, h = 120):
+    def __init__(self, w = 1000, h = 400):
         self.focused = False
+        self.w = w
+        self.h = h
 
     def draw_border(self):
-        pass
+        pygame.draw.rect(screen, (255, 255, 255), (0, 0, self.w, self.h), 1)
 
     def draw(self):
         self.focused = True
+        self.draw_border()
 
     def hide(self):
         self.focused = False
         screen.fill((90, 90, 90))
 
-    def splawn(self, unit, prev_x=0, prev_y=0, new_x=0, new_y=0):
-        unit.draw_on_map(new_x, new_y)
 
 
 width = 1200
@@ -355,7 +378,9 @@ while True:
                 player.up_pressed = True
             if event.key == pygame.K_DOWN:
                 player.down_pressed = True
+
         if event.type == pygame.KEYUP:
+            
             if event.key == pygame.K_LEFT:
                 player.left_pressed = False
             if event.key == pygame.K_RIGHT:
@@ -364,6 +389,7 @@ while True:
                 player.up_pressed = False
             if event.key == pygame.K_DOWN:
                 player.down_pressed = False
+
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             if spin_button.clicked():
@@ -399,8 +425,8 @@ while True:
                 show_wheel_button.hide()
                 world.draw()
                 back_menu_button.draw()
-                player.position_x = 100
-                player.position_y = 100
+                player.position_x = 300
+                player.position_y = 300
                 exit_button.draw()
 
     player.update()
