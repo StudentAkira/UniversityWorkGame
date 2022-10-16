@@ -120,8 +120,49 @@ class Player:
             return
 
         #spawn place
-        self.x = 200
-        self.y = 200
+        #self.x = 200
+        #self.y = 200
+
+
+class  Mob(Player):
+
+    def __init__(self, hp = 10, damage = 10):
+        super(Mob, self).__init__(self)
+        self.hp = 10
+        self.damage = 10
+        self.x = random.randint(0, world.w-1)
+        self.y = random.randint(0, world.h-1)
+
+        self.img = pygame.image.load('images/Mob.png')
+        self.size = (30, 50)
+        self.img = pygame.transform.scale(self.img, (self.size[0], self.size[1]))
+        self.rect = self.img.get_rect(
+            center=(self.x, self.y)
+        )
+
+        self.speed = 0.25
+
+    def follow_player(self):
+        if world.focused:
+            self.hide(self.x, self.y)
+
+            self.velX = 0
+            self.velY = 0
+
+            sign_x = 1 if player.x - self.x > 0 else -1
+            sign_y = 1 if player.y - self.y > 0 else -1
+
+            self.velX += self.speed*sign_x
+            self.velY -= self.speed*sign_y
+
+            self.x += self.velX
+            self.y -= self.velY
+
+            self.rect = self.img.get_rect(
+                center=(self.x, self.y)
+            )
+    
+
 
 
 class Charecter:
@@ -328,6 +369,12 @@ class World:
         self.focused = False
         screen.fill((90, 90, 90))
 
+    def spawn_mobs(self, mobs):
+        while True:
+            if world.focused:
+                time.sleep(2)
+                mobs.append(Mob())
+
 
 
 width = 1200
@@ -360,9 +407,11 @@ player.open_data('Akira')
 player.show_player_data()
 
 world = World()
+mobs = []
+threading.Thread(target=world.spawn_mobs, args=(mobs,)).start()
 
 while True:
-    
+
     pygame.display.update()
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -409,8 +458,8 @@ while True:
                 threading.Thread(target=wheel.show_wheel).start()
 
             if back_menu_button.clicked():
-                player.position_x = 0
-                player.position_y = 0
+                player.x = 50
+                player.y = 50
                 screen.fill((90, 90, 90))
                 world.hide()
                 spin_button.hide()
@@ -421,16 +470,19 @@ while True:
                 exit_button.draw()
 
             if play_button.clicked():
+                player.x = 50
+                player.y = 50
                 play_button.hide()
                 show_wheel_button.hide()
                 world.draw()
                 back_menu_button.draw()
-                player.position_x = 300
-                player.position_y = 300
                 exit_button.draw()
 
     player.update()
     player.draw(screen)
+    for mob in mobs:
+        mob.follow_player()
+        mob.draw(screen)
     pygame.display.flip()
 
 
