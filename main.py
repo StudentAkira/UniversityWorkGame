@@ -13,8 +13,26 @@ class Player:
         self.money = money
         self.inventory = inventory
         self.rating = rating
-        self.position_x = 0
-        self.position_y = 0
+
+        self.x = 0
+        self.y = 0
+
+        self.img = pygame.image.load('images/Mob.png')
+        self.size = (30, 50)
+        self.img = pygame.transform.scale(self.img, (self.size[0], self.size[1]))
+        self.rect = self.img.get_rect(
+            center=(self.x, self.y)
+        )
+
+        self.color = (250, 120, 60)
+        self.velX = 0
+        self.velY = 0
+        self.left_pressed = False
+        self.right_pressed = False
+        self.up_pressed = False
+        self.down_pressed = False
+        self.speed = 1
+
 
     def save_data(self):
         data = {
@@ -48,31 +66,40 @@ class Player:
         print(" Money :: ", self.money)
         print(" Inventory :: ", self.inventory)
 
-    def draw_on_map(self, world):
-        step = world.sqared_side_length
-        x = self.position_x
-        y = self.position_y
+    def hide(self):
+        pygame.draw.rect(screen, (90, 90, 90), (self.x-self.size[0]/2,
+                                                self.y-self.size[1]/2,
+                                                100,
+                                                100))
 
-        hero = pygame.image.load('images/Venty.png')
-        #rundom numbers
-        hero = pygame.transform.scale(hero, (30, 50))
-        hero_rect = hero.get_rect(
-            center=(x*step,y*step)
-        )
-        screen.blit(hero, hero_rect)
+    def draw(self, win):
+        if world.focused:
+            self.hide()
+            screen.blit(self.img, self.rect)
 
-    def beat(self, charecer):
-        mouse_postition = pygame.mouse.get_pos()
-        beat_pos_x = int(mouse_postition[0]/world.sqared_side_length)
-        beat_pos_y = int(mouse_postition[1]/world.sqared_side_length)
-        print(beat_pos_x, beat_pos_y)
+    def update(self):
+        self.velX = 0
+        self.velY = 0
+        if world.focused:
 
-        i = self.position_x
-        j = self.position_y
-        while i < beat_pos_x or j < beat_pos_y:
-            while i < charecer.damage_engle:
-                if world.focused[i] == -1:
-                    pass
+            if self.left_pressed and not self.right_pressed:
+                self.velX = -self.speed
+            if self.right_pressed and not self.left_pressed:
+                self.velX = self.speed
+            if self.up_pressed and not self.down_pressed:
+                self.velY = -self.speed
+            if self.down_pressed and not self.up_pressed:
+                self.velY = self.speed
+
+            self.x += self.velX
+            self.y += self.velY
+
+            self.rect = pygame.Rect(int(self.x), int(self.y), 32, 32)
+            return
+
+        self.x = 0
+        self.y = 0
+
 
 
 class Charecter:
@@ -123,20 +150,6 @@ class Charecter:
             "damage":self.damage
         })
 
-class Mob:
-
-    health = 500
-    damage = 30
-    def draw_on_map(self):
-        step = world.sqared_side_length
-
-        mob = pygame.image.load('images/Mob.png')
-        mob = pygame.transform.scale(mob, (30, 50))
-        world.field[int(200/step)][int(200/step)] = -1
-        mob_rect = mob.get_rect(
-            center=(300, 200)
-        )
-        screen.blit(mob, mob_rect)
 
 class WheelOfLuck:
     color = [0, 20, 0]
@@ -230,6 +243,7 @@ class WheelOfLuck:
         player.show_player_data()
         player.save_data()
 
+
 class Button:
     font_size = 35
 
@@ -273,60 +287,24 @@ class Button:
         
         return  False
 
+
 class World:
 
     def __init__(self, w = 200, h = 120):
-        self.w = w#row
-        self.h = h#column
-        self.sqared_side_length = 4
-
-        self.field = [[0 for j in range(self.w)] for i in range(int(self.h))]
         self.focused = False
 
     def draw_border(self):
-        pygame.draw.rect(screen, (255, 90, 90), [
-            1,
-            1,
-            self.w * self.sqared_side_length,
-            self.h * self.sqared_side_length
-        ], 1)
+        pass
+
     def draw(self):
-        self.draw_border()
         self.focused = True
-        for h in range(int(len(self.field))):
-            for w in range(len(self.field[h])):
-                pygame.draw.rect(screen, (90, 90, 90), [
-                    (w*self.sqared_side_length),
-                    (h*self.sqared_side_length),
-                    (self.sqared_side_length),
-                    (self.sqared_side_length)
-                ], 1)
 
     def hide(self):
         self.focused = False
         screen.fill((90, 90, 90))
 
-    def spawn_mob(self):
-        mob = Mob()
-        mob.draw_on_map()
-
-    def splawn_player(self, player, prev_x=0, prev_y=0, new_x=0, new_y=0):
-
-        pygame.draw.rect(screen, (90, 90, 90), [
-            prev_x*self.sqared_side_length-15,
-            prev_y*self.sqared_side_length-25,
-            30,
-            50
-        ],)
-        self.draw_border()
-        if new_x > world.w: new_x = 0
-        if new_x < 0: new_x = world.w - 1
-        if new_y > world.h: new_y = 0
-        if new_y < 0: new_y = world.h - 1
-        
-        player.position_x = new_x
-        player.position_y = new_y
-        player.draw_on_map(self)
+    def splawn(self, unit, prev_x=0, prev_y=0, new_x=0, new_y=0):
+        unit.draw_on_map(new_x, new_y)
 
 
 width = 1200
@@ -335,6 +313,7 @@ height = 600
 pygame.init()
 
 screen = pygame.display.set_mode((width, height))
+
 screen.fill((90,90,90))
 
 charecters = [Charecter().open_data(i) for i in range(7)]
@@ -360,25 +339,31 @@ player.show_player_data()
 world = World()
 
 while True:
+    
     pygame.display.update()
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
 
-        prev_position_x = player.position_x
-        prev_position_y = player.position_y
-        keys = pygame.key.get_pressed()
-        if world.focused:
-            player.position_x += keys[pygame.K_d] - keys[pygame.K_a]
-            player.position_y -= keys[pygame.K_w] - keys[pygame.K_s]
-
-            world.splawn_player(player, prev_position_x, prev_position_y, player.position_x, player.position_y)
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                player.beat()
-
-
-
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_LEFT:
+                player.left_pressed = True
+            if event.key == pygame.K_RIGHT:
+                player.right_pressed = True
+            if event.key == pygame.K_UP:
+                player.up_pressed = True
+            if event.key == pygame.K_DOWN:
+                player.down_pressed = True
+        if event.type == pygame.KEYUP:
+            if event.key == pygame.K_LEFT:
+                player.left_pressed = False
+            if event.key == pygame.K_RIGHT:
+                player.right_pressed = False
+            if event.key == pygame.K_UP:
+                player.up_pressed = False
+            if event.key == pygame.K_DOWN:
+                player.down_pressed = False
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             if spin_button.clicked():
@@ -400,6 +385,7 @@ while True:
             if back_menu_button.clicked():
                 player.position_x = 0
                 player.position_y = 0
+                screen.fill((90, 90, 90))
                 world.hide()
                 spin_button.hide()
                 wheel.hide()
@@ -412,10 +398,15 @@ while True:
                 play_button.hide()
                 show_wheel_button.hide()
                 world.draw()
-                world.spawn_mob()
-                world.splawn_player(player, 0, 0, 20, 20)
                 back_menu_button.draw()
+                player.position_x = 100
+                player.position_y = 100
                 exit_button.draw()
+
+    player.update()
+    player.draw(screen)
+    pygame.display.flip()
+
 
 
 
