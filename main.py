@@ -16,8 +16,10 @@ class Player:
         self.rating = rating
         self.damage = 10
         self.speed = 10
-        self.health = 10
+        self.hp = 10
         self.chosen_charecter_name = ''
+        self.kill_count = 0
+        self.can_spin = False
 
         self.x = 0
         self.y = 0
@@ -43,7 +45,7 @@ class Player:
         self.chosen_charecter = charecter
         self.damage = charecter.damage
         self.speed = charecter.speed
-        self.health = charecter.health
+        self.hp = charecter.hp
         self.chosen_charecter_name = charecter.name
         self.img = pygame.image.load(charecter.img)
         self.size = (100, 75)
@@ -55,7 +57,8 @@ class Player:
             "rating":self.rating,
             "level":self.level,
             "money":self.money,
-            "inventory":self.inventory
+            "inventory":self.inventory,
+            "killcount":self.kill_count,
         }
         data_ = json.dumps(data)
         with open(f'{self.name}','w') as file:
@@ -70,6 +73,7 @@ class Player:
                 self.level = data['level']
                 self.money = data['money']
                 self.inventory = data['inventory']
+                self.kill_count = data['killcount']
 
         except:
             print("NO SUCH PLAYER")
@@ -83,14 +87,30 @@ class Player:
 
     def hide(self, prev_x, prev_y):
         pygame.draw.rect(screen, (90, 90, 90), (prev_x-self.size[0]/2,
-                                                prev_y-self.size[1]/2,
+                                                prev_y-self.size[1]/2-30,
                                                 self.size[0]*1.1,
-                                                self.size[1]*1.1))
+                                                self.size[1]*1.1 + 30))
 
+    def draw_hp(self):
+        max_hp = self.chosen_charecter.hp
+        currecnt_hp = self.hp
+        pygame.draw.rect(screen, (0, 0, 0), (
+                                             self.x - self.size[0]/2,
+                                             self.y - self.size[1]/2 - 30,
+                                             self.size[0],
+                                             5))
+
+        pygame.draw.rect(screen, (200, 200, 200), (
+                                           self.x - self.size[0]/2,
+                                           self.y - self.size[1]/2 - 30,
+                                           self.size[0]*(currecnt_hp/max_hp),
+                                           5))
     def draw(self, win):
         if world.focused:
             world.draw(self, items)
             screen.blit(self.img, self.rect)
+            self.draw_hp()
+
 
     def update(self):
         self.velX = 0
@@ -142,12 +162,13 @@ class Player:
 
 class  Mob(Player):
 
-    def __init__(self, hp = 10, damage = 10000, speed=0):
+    def __init__(self, hp = 10, damage = 1000, speed=0):
         super(Mob, self).__init__(self)
-        self.hp = hp
+        self.hp = random.randint(1000, 18000)
         self.damage = damage
         self.x = random.randint(0, world.w-1)
         self.y = random.randint(0, world.h-1)
+        self.chosen_charecter = Charecter(-1, '', '', 0, self.hp, self.damage)
 
         self.img = pygame.image.load('images/Mob.png')
         self.size = (30, 50)
@@ -193,17 +214,17 @@ class  Mob(Player):
 
     def attack(self):
         if self.rect.colliderect(player.rect):
-            player.health -= mob.damage*10
+            player.hp -= mob.damage
 
 
 class Charecter:
 
-    def __init__(self, id=-1, name='', history='', rarity=0, health=10, damage=10, damage_engle=2):
+    def __init__(self, id=-1, name='', history='', rarity=0, hp=10, damage=10):
         self.id = id
         self.name = name
         self.history = history
         self.rarity = rarity
-        self.health = health
+        self.hp = hp
         self.damage = damage
         self.speed = 4
         self.img = ''
@@ -214,7 +235,7 @@ class Charecter:
             "name":self.name,
             "history":self.history,
             "rarity":self.rarity,
-            "health":self.health,
+            "hp":self.hp,
             "damage":self.damage,
             "speed": self.speed,
             "img": self.img,
@@ -234,7 +255,7 @@ class Charecter:
             self.name = data['name']
             self.history = data['history']
             self.rarity = data['rarity']
-            self.health = data['health']
+            self.hp = data['hp']
             self.damage = data['damage']
             self.speed = data['speed']
             self.img = data['img']
@@ -246,7 +267,7 @@ class Charecter:
             "name":self.name,
             "history":self.history,
             "rarity":self.rarity,
-            "health":self.health,
+            "hp":self.hp,
             "damage":self.damage
         })
 
@@ -399,18 +420,9 @@ class World:
         pygame.draw.rect(screen, (255, 255, 255), (0, 0, self.w, self.h), 1)
 
     def draw_items(self, items):
+
         for item in items:
             item.draw()
-
-        ch_name = item.text
-        for ch in tmp_charecters:
-            if ch.name == ch_name:
-                font = pygame.font.SysFont('Corbel', 15)
-                text = font.render(str(ch.health), True, [200, 200, 200])
-                screen.blit(text, [
-                    item.button_position_x,
-                    item.button_position_y-20,
-                ])
 
     def draw(self, player, items):
         self.focused = True
@@ -472,6 +484,8 @@ show_wheel_button.draw()
 play_button = Button(0.5, 0.43, 'PLAY', True)
 play_button.draw()
 
+spin_coast = 10
+
 tmp_charecters = []
 while True:
 
@@ -511,6 +525,7 @@ while True:
             if spin_button.clicked():
                 threading.Thread(target=wheel.spin_wheel, args=(player,)).start()
                 spin_button.hide()
+                player.can_spin = False
 
             if exit_button.clicked():
                 pygame.quit()
@@ -520,7 +535,8 @@ while True:
                 wheel.shuf_charecters()
                 show_wheel_button.hide()
                 play_button.hide()
-                spin_button.draw()
+                if player.can_spin:
+                    spin_button.draw()
                 back_menu_button.draw()
                 threading.Thread(target=wheel.show_wheel).start()
 
@@ -537,6 +553,7 @@ while True:
                 exit_button.draw()
 
             if play_button.clicked():
+                prev_kill_count = player.kill_count
                 tmp_charecters = charecters
                 mobs_spawning = threading.Thread(target=world.spawn_mobs, args=(mobs, 10))
                 player.x = 50
@@ -552,20 +569,18 @@ while True:
                 if item.clicked():
                     for ch in tmp_charecters:
                         if ch.name == player.chosen_charecter.name:
-                            ch.health = player.health
+                            ch.hp = player.hp
                     for ch in tmp_charecters:
                         if ch.name == item.text:
                             player.set_charecter(ch)
-                
-
 
     for mob in mobs:
 
-        print(player.chosen_charecter_name, player.health)
-        if player.health < 0:
+        if player.hp < 0:
+            player.save_data()
             player.x = 50
             player.y = 50
-            player.health = player.chosen_charecter.health
+            player.hp = player.chosen_charecter.hp
             screen.fill((90, 90, 90))
             world.hide(items)
             spin_button.hide()
@@ -581,18 +596,9 @@ while True:
             continue
         mob.hide(mob.x, mob.y)
         mobs.remove(mob)
+        player.kill_count += 1
+        if player.kill_count - prev_kill_count > spin_coast: player.can_spin = True
 
-
-        
     player.update()
     player.draw(screen)
     pygame.display.flip()
-
-
-
-
-
-
-
-
-
