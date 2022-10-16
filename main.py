@@ -13,6 +13,8 @@ class Player:
         self.money = money
         self.inventory = inventory
         self.rating = rating
+        self.damage = 100
+        self.speed = 2
 
         self.x = 0
         self.y = 0
@@ -31,7 +33,7 @@ class Player:
         self.right_pressed = False
         self.up_pressed = False
         self.down_pressed = False
-        self.speed = 1
+
         self.scaled = False
 
 
@@ -110,26 +112,29 @@ class Player:
             )
 
             if self.x-prev_x > 0 and not self.scaled:
-                player.img = pygame.transform.flip(player.img, True, False)
+                self.img = pygame.transform.flip(self.img, True, False)
                 self.scaled = True
 
             if self.x - prev_x < 0 and self.scaled:
-                player.img = pygame.transform.flip(player.img, True, False)
+                self.img = pygame.transform.flip(self.img, True, False)
                 self.scaled = False
                 
             return
 
-        #spawn place
-        #self.x = 200
-        #self.y = 200
+    def attack(self, mobs):
+        for mob in mobs:
+            if self.rect.colliderect(mob.rect):
+                mob.hp -= player.damage
+
+
 
 
 class  Mob(Player):
 
-    def __init__(self, hp = 10, damage = 10):
+    def __init__(self, hp = 10, damage = 10, speed=0):
         super(Mob, self).__init__(self)
-        self.hp = 10
-        self.damage = 10
+        self.hp = hp
+        self.damage = damage
         self.x = random.randint(0, world.w-1)
         self.y = random.randint(0, world.h-1)
 
@@ -140,7 +145,7 @@ class  Mob(Player):
             center=(self.x, self.y)
         )
 
-        self.speed = 0.25
+        self.speed = speed
 
     def follow_player(self):
         if world.focused:
@@ -152,28 +157,40 @@ class  Mob(Player):
             sign_x = 1 if player.x - self.x > 0 else -1
             sign_y = 1 if player.y - self.y > 0 else -1
 
+            prev_x = self.x
+            prev_y = self.y
+
             self.velX += self.speed*sign_x
             self.velY -= self.speed*sign_y
 
             self.x += self.velX
             self.y -= self.velY
 
+            if self.x-prev_x > 0 and not self.scaled:
+                self.img = pygame.transform.flip(self.img, True, False)
+                self.scaled = True
+
+            if self.x - prev_x < 0 and self.scaled:
+                self.img = pygame.transform.flip(self.img, True, False)
+                self.scaled = False
+
             self.rect = self.img.get_rect(
                 center=(self.x, self.y)
             )
-    
+            self.draw(screen)
 
 
 
 class Charecter:
 
-    def __init__(self, id=-1, name='', history='', rarity=0, health=0, damage=0, damage_engle=2):
+    def __init__(self, id=-1, name='', history='', rarity=0, health=10, damage=10, damage_engle=2):
         self.id = id
         self.name = name
         self.history = history
         self.rarity = rarity
         self.health = health
         self.damage = damage
+        self.speed = 4
 
     def save_data(self):
         data = {
@@ -369,12 +386,10 @@ class World:
         self.focused = False
         screen.fill((90, 90, 90))
 
-    def spawn_mobs(self, mobs):
-        while True:
-            if world.focused:
-                time.sleep(2)
-                mobs.append(Mob())
-
+    def spawn_mobs(self, mobs, max_mobs):
+        while world.focused:
+            time.sleep(1)
+            mobs.append(Mob(1, 1, random.uniform(0.25, player.speed - 1 )))
 
 
 width = 1200
@@ -402,13 +417,12 @@ show_wheel_button.draw()
 play_button = Button(0.5, 0.43, 'PLAY', True)
 play_button.draw()
 
-player = Player()
+player = Player(charecters[0])
 player.open_data('Akira')
 player.show_player_data()
 
 world = World()
 mobs = []
-threading.Thread(target=world.spawn_mobs, args=(mobs,)).start()
 
 while True:
 
@@ -417,6 +431,10 @@ while True:
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_d:
+                player.attack(mobs)
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
@@ -470,6 +488,7 @@ while True:
                 exit_button.draw()
 
             if play_button.clicked():
+                mobs_spawning = threading.Thread(target=world.spawn_mobs, args=(mobs, 10))
                 player.x = 50
                 player.y = 50
                 play_button.hide()
@@ -477,12 +496,21 @@ while True:
                 world.draw()
                 back_menu_button.draw()
                 exit_button.draw()
+                mobs_spawning.start()
+                
 
+
+    for mob in mobs:
+        if mob.hp > 0:
+            mob.follow_player()
+            continue
+        mob.hide(mob.x, mob.y)
+        mobs.remove(mob)
+
+
+        
     player.update()
     player.draw(screen)
-    for mob in mobs:
-        mob.follow_player()
-        mob.draw(screen)
     pygame.display.flip()
 
 
