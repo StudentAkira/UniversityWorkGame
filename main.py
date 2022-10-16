@@ -6,6 +6,7 @@ import time
 import random
 import threading
 
+
 class Player:
     def __init__(self, name='Player', rating = 0, level = 0, money = 0, inventory = []):
         self.name = name
@@ -13,14 +14,16 @@ class Player:
         self.money = money
         self.inventory = inventory
         self.rating = rating
-        self.damage = 100
-        self.speed = 2
+        self.damage = 10
+        self.speed = 10
+        self.health = 10
+        self.chosen_charecter_name = ''
 
         self.x = 0
         self.y = 0
 
         self.img = pygame.image.load('images/Mob.png')
-        self.size = (30, 50)
+        self.size = (60, 100)
         self.img = pygame.transform.scale(self.img, (self.size[0], self.size[1]))
         self.rect = self.img.get_rect(
             center=(self.x, self.y)
@@ -36,6 +39,15 @@ class Player:
 
         self.scaled = False
 
+    def set_charecter(self, charecter):
+        self.chosen_charecter = charecter
+        self.damage = charecter.damage
+        self.speed = charecter.speed
+        self.health = charecter.health
+        self.chosen_charecter_name = charecter.name
+        self.img = pygame.image.load(charecter.img)
+        self.size = (100, 75)
+        self.img = pygame.transform.scale(self.img, (self.size[0], self.size[1]))
 
     def save_data(self):
         data = {
@@ -72,12 +84,12 @@ class Player:
     def hide(self, prev_x, prev_y):
         pygame.draw.rect(screen, (90, 90, 90), (prev_x-self.size[0]/2,
                                                 prev_y-self.size[1]/2,
-                                                self.size[0],
-                                                self.size[1]))
+                                                self.size[0]*1.1,
+                                                self.size[1]*1.1))
 
     def draw(self, win):
         if world.focused:
-            world.draw()
+            world.draw(self, items)
             screen.blit(self.img, self.rect)
 
     def update(self):
@@ -128,10 +140,9 @@ class Player:
 
 
 
-
 class  Mob(Player):
 
-    def __init__(self, hp = 10, damage = 10, speed=0):
+    def __init__(self, hp = 10, damage = 10000, speed=0):
         super(Mob, self).__init__(self)
         self.hp = hp
         self.damage = damage
@@ -178,7 +189,11 @@ class  Mob(Player):
                 center=(self.x, self.y)
             )
             self.draw(screen)
+            self.attack()
 
+    def attack(self):
+        if self.rect.colliderect(player.rect):
+            player.health -= mob.damage*10
 
 
 class Charecter:
@@ -191,6 +206,7 @@ class Charecter:
         self.health = health
         self.damage = damage
         self.speed = 4
+        self.img = ''
 
     def save_data(self):
         data = {
@@ -199,7 +215,9 @@ class Charecter:
             "history":self.history,
             "rarity":self.rarity,
             "health":self.health,
-            "damage":self.damage
+            "damage":self.damage,
+            "speed": self.speed,
+            "img": self.img,
         }
         data_ = json.dumps(data)
         with open('charecters','r+') as file:
@@ -218,6 +236,8 @@ class Charecter:
             self.rarity = data['rarity']
             self.health = data['health']
             self.damage = data['damage']
+            self.speed = data['speed']
+            self.img = data['img']
         return self
 
     def print_data(self):
@@ -319,16 +339,17 @@ class WheelOfLuck:
             j += speed
             if(j > 0.8 * spin): speed = 1
             if (j > 0.95 * spin): speed = 0.2
-        player.inventory.append(chosen_charecter.id)
-        player.show_player_data()
-        player.save_data()
+
+        if chosen_charecter.id not in player.inventory:
+            player.inventory.append(chosen_charecter.id)
+            player.show_player_data()
+            player.save_data()
 
 
 class Button:
-    font_size = 35
 
-    def __init__(self, x, y, text="empty button", focused=False):
-
+    def __init__(self, x, y, text="empty button", focused=False, fs=35):
+        self.font_size = fs
         smallfont = pygame.font.SysFont('Corbel', self.font_size)
         self.text_rect = smallfont.render(text, True, (200, 200, 200))
 
@@ -351,12 +372,11 @@ class Button:
             self.text_rect.get_size()[0],
             self.text_rect.get_size()[1]
         ])
-        
         self.focused = False
 
 
-    def clicked(self):
-
+    def clicked(self, forced = False):
+        if forced: forced
         pygame.display.update()
         mouse = pygame.mouse.get_pos()
         if self.button_position_x \
@@ -378,13 +398,30 @@ class World:
     def draw_border(self):
         pygame.draw.rect(screen, (255, 255, 255), (0, 0, self.w, self.h), 1)
 
-    def draw(self):
+    def draw_items(self, items):
+        for item in items:
+            item.draw()
+
+        ch_name = item.text
+        for ch in tmp_charecters:
+            if ch.name == ch_name:
+                font = pygame.font.SysFont('Corbel', 15)
+                text = font.render(str(ch.health), True, [200, 200, 200])
+                screen.blit(text, [
+                    item.button_position_x,
+                    item.button_position_y-20,
+                ])
+
+    def draw(self, player, items):
         self.focused = True
         self.draw_border()
+        self.draw_items(items)
 
-    def hide(self):
+    def hide(self, items):
         self.focused = False
         screen.fill((90, 90, 90))
+        for item in items:
+            item.hide()
 
     def spawn_mobs(self, mobs, max_mobs):
         while world.focused:
@@ -403,6 +440,24 @@ screen.fill((90,90,90))
 
 charecters = [Charecter().open_data(i) for i in range(7)]
 
+player = Player()
+player.open_data('Akira')
+player.set_charecter(charecters[player.inventory[0]-1])
+player.show_player_data()
+
+world = World()
+mobs = []
+
+items = []
+inventory = []
+for item in player.inventory:
+    for ch in charecters:
+        if ch.id == item:
+            inventory.append(ch.name)
+for item in range(len(inventory)):
+    items.append(Button(0.1 + 0.1*item, 0.9, inventory[item], True, 15))
+
+
 wheel = WheelOfLuck(screen, charecters, height/2, 175)
 
 
@@ -417,13 +472,7 @@ show_wheel_button.draw()
 play_button = Button(0.5, 0.43, 'PLAY', True)
 play_button.draw()
 
-player = Player(charecters[0])
-player.open_data('Akira')
-player.show_player_data()
-
-world = World()
-mobs = []
-
+tmp_charecters = []
 while True:
 
     pygame.display.update()
@@ -479,7 +528,7 @@ while True:
                 player.x = 50
                 player.y = 50
                 screen.fill((90, 90, 90))
-                world.hide()
+                world.hide(items)
                 spin_button.hide()
                 wheel.hide()
                 back_menu_button.hide()
@@ -488,19 +537,45 @@ while True:
                 exit_button.draw()
 
             if play_button.clicked():
+                tmp_charecters = charecters
                 mobs_spawning = threading.Thread(target=world.spawn_mobs, args=(mobs, 10))
                 player.x = 50
                 player.y = 50
                 play_button.hide()
                 show_wheel_button.hide()
-                world.draw()
                 back_menu_button.draw()
                 exit_button.draw()
+                world.draw(player, items)
                 mobs_spawning.start()
+
+            for item in items:
+                if item.clicked():
+                    for ch in tmp_charecters:
+                        if ch.name == player.chosen_charecter.name:
+                            ch.health = player.health
+                    for ch in tmp_charecters:
+                        if ch.name == item.text:
+                            player.set_charecter(ch)
                 
 
 
     for mob in mobs:
+
+        print(player.chosen_charecter_name, player.health)
+        if player.health < 0:
+            player.x = 50
+            player.y = 50
+            player.health = player.chosen_charecter.health
+            screen.fill((90, 90, 90))
+            world.hide(items)
+            spin_button.hide()
+            wheel.hide()
+            back_menu_button.hide()
+            show_wheel_button.draw()
+            play_button.draw()
+            exit_button.draw()
+            mobs = []
+            break
         if mob.hp > 0:
             mob.follow_player()
             continue
