@@ -81,9 +81,10 @@ class Player:
             self.size[0]*1.1,
             self.size[1]*1.1 + 30))
 
-    def draw_hp(self):
-        max_hp = self.chosen_charecter.hp
+    def draw_hp(self, charecters):
+        max_hp = list(filter(lambda charecter: charecter.name == self.chosen_charecter.name, charecters))[0].hp
         currecnt_hp = self.hp
+
         pygame.draw.rect(screen, (0, 0, 0), (
             self.x - self.size[0]/2,
             self.y - self.size[1]/2 - 30,
@@ -96,11 +97,11 @@ class Player:
             self.size[0]*(currecnt_hp/max_hp),
             5))
 
-    def draw(self, win):
+    def draw(self, win, charecters):
         if world.focused:
             world.draw()
             screen.blit(self.img, self.rect)
-            self.draw_hp()
+            self.draw_hp(charecters)
 
 
     def update(self):
@@ -211,9 +212,13 @@ class Charecter:
 
 class  Mob(Player):
 
-    def __init__(self):
+    def __init__(self, world):
         super(Mob, self).__init__(self)
-        self.chosen_charecter = Charecter(-1, '', '', 0,
+        self.world = world
+        self.chosen_charecter = Charecter(-1,#id
+                                          'NoName',#name
+                                          '',#history
+                                          0,#rarity
                                           random.randint(1000, 18000),#hp
                                           random.randint(1, 2),#damage
                                           random.randint(1, 3))#speed
@@ -265,12 +270,13 @@ class  Mob(Player):
             self.rect = self.img.get_rect(
                 center=(self.x, self.y)
             )
-            self.draw(screen)
+            self.draw(screen, [self.chosen_charecter])
         self.attack()
 
     def attack(self):
         if self.rect.colliderect(player.rect):
             player.hp -= mob.damage
+            world.update_tmp_charecters()
 
 
 class WheelOfLuck:
@@ -385,27 +391,35 @@ class Button:
 
     def __init__(self, x, y, text="empty button", focused=False, fs=35):
         self.font_size = fs
-        smallfont = pygame.font.SysFont('Corbel', self.font_size)
-        self.text_rect = smallfont.render(text, True, (200, 200, 200))
+        self.smallfont = pygame.font.SysFont('Corbel', self.font_size)
+        self.text_rect = self.smallfont.render(text, True, (200, 200, 200))
 
         self.button_position_x = x * width - 0.5 * self.text_rect.get_size()[0]
         self.button_position_y = y * height - 0.5 * self.text_rect.get_size()[1]
         self.text = text
         self.focused = focused
 
-    def draw(self):
+    def draw(self, additional_info = ''):
         screen.blit(self.text_rect, (
             self.button_position_x,
             self.button_position_y
         ))
+
+        additional_info_text = self.smallfont.render(additional_info, True, (200, 200, 200))
+
+        screen.blit(additional_info_text, (
+            self.button_position_x,
+            self.button_position_y - 20
+        ))
         self.focused = True
+
         
     def hide(self):
         pygame.draw.rect(screen, (90,90,90),[
             self.button_position_x,
-            self.button_position_y,
-            self.text_rect.get_size()[0],
-            self.text_rect.get_size()[1]
+            self.button_position_y - 50,
+            self.text_rect.get_size()[0] + 50,
+            self.text_rect.get_size()[1] + 50
         ])
         self.focused = False
 
@@ -449,7 +463,10 @@ class World:
 
     def draw_charecters_switch_buttons(self):
         for charecter_switch_button in self.charecters_switch_buttons:
-            charecter_switch_button.draw()
+            charecter_switch_button.hide()
+            charecter_hp = list(filter(lambda charecter:charecter.name == charecter_switch_button.text, self.tmp_charecters))[0].hp
+
+            charecter_switch_button.draw(str(charecter_hp))
 
     def draw(self):
         self.focused = True
@@ -465,14 +482,20 @@ class World:
     def spawn_mobs(self, mobs, max_mobs):
         while world.focused:
             time.sleep(self.spawnd_delay)
-            mobs.append(Mob())
+            mobs.append(Mob(self))
+
+    def update_tmp_charecters(self):
+        damaged_charecter = list(filter(lambda charecter: charecter.name == self.player.chosen_charecter.name, self.tmp_charecters))[0]
+        self.tmp_charecters[self.tmp_charecters.index(damaged_charecter)].hp = self.player.hp
 
     def check_swith_buttons(self):
         for button in self.charecters_switch_buttons:
             if button.clicked():
                 prev_charecter = self.player.chosen_charecter
+                #self.tmp_charecters[self.tmp_charecters.index(prev_charecter)].hp = self.player.hp
                 current_charecter = list(filter(lambda charecter:charecter.name == button.text, self.tmp_charecters))[0]
                 self.player.set_charecter(current_charecter)
+                print([(charecter.name, charecter.hp) for charecter in self.tmp_charecters])
 
 
 
@@ -568,6 +591,7 @@ while True:
                 threading.Thread(target=wheel.show_wheel).start()
 
             if back_menu_button.clicked():
+                world = World(player, charecters)
                 player.x = 50
                 player.y = 50
                 screen.fill((90, 90, 90))
@@ -579,10 +603,10 @@ while True:
                 exit_button.draw()
 
             if play_button.clicked():
-                spin_button
                 prev_kill_count = player.kill_count
                 print(player.inventory)
                 charecters = [Charecter().open_data(i) for i in range(7)]
+                player.set_charecter(charecters[player.inventory[0]])
                 tmp_charecters = [charecters[i] for i in player.inventory]
                 mobs_spawning = threading.Thread(target=world.spawn_mobs, args=(mobs, 10))
                 player.x = 50
@@ -599,11 +623,12 @@ while True:
     if world.focused:
         for mob in mobs:
             if player.hp < 0:
+                world = World(player, charecters)
+                player.set_charecter(charecters[player.inventory[0]])
                 player.save_data()
                 player.x = 50
                 player.y = 50
                 screen.fill((90, 90, 90))
-                player.hp = player.chosen_charecter.hp
                 world.hide()
                 back_menu_button.hide()
                 show_wheel_button.draw()
@@ -620,5 +645,5 @@ while True:
             if player.kill_count - prev_kill_count > spin_coast: player.can_spin = True
 
     player.update()
-    player.draw(screen)
+    player.draw(screen, charecters)
     pygame.display.flip()
