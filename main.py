@@ -11,30 +11,17 @@ pi = math.pi
 
 
 class Player:
-    def __init__(self, name='Player', rating = 0, level = 0, money = 0, inventory = []):
+    def __init__(self, name='Player', inventory = []):
         self.name = name
-        self.level = level
-        self.money = money
         self.inventory = inventory
-        self.rating = rating
-        self.damage = 10
-        self.speed = 10
-        self.hp = 10
-        self.chosen_charecter_name = ''
         self.kill_count = 0
-        self.can_spin = True
+        self.damage = 0
+        self.speed = 0
+        self.hp = 0
+        self.chosen_charecter_name = 0
 
         self.x = 0
         self.y = 0
-
-        self.img = pygame.image.load('images/Mob.png')
-        self.size = (60, 100)
-        self.img = pygame.transform.scale(self.img, (self.size[0], self.size[1]))
-        self.rect = self.img.get_rect(
-            center=(self.x, self.y)
-        )
-
-        self.color = (250, 120, 60)
         self.velX = 0
         self.velY = 0
         self.left_pressed = False
@@ -42,7 +29,15 @@ class Player:
         self.up_pressed = False
         self.down_pressed = False
 
+        self.can_spin = False
         self.scaled = False
+
+        self.img = pygame.image.load('images/Mob.png')
+        self.size = (60, 100)
+        self.img = pygame.transform.scale(self.img, (self.size[0], self.size[1]))
+        self.rect = self.img.get_rect(
+            center=(self.x, self.y)
+        )
 
     def set_charecter(self, charecter):
         self.chosen_charecter = charecter
@@ -57,9 +52,6 @@ class Player:
     def save_data(self):
         data = {
             "name":self.name,
-            "rating":self.rating,
-            "level":self.level,
-            "money":self.money,
             "inventory":self.inventory,
             "killcount":self.kill_count,
         }
@@ -72,9 +64,6 @@ class Player:
             with open(f'{palyer_name}','r') as file:
                 data = json.load(file)
                 self.name = data['name']
-                self.rating = data['rating']
-                self.level = data['level']
-                self.money = data['money']
                 self.inventory = data['inventory']
                 self.kill_count = data['killcount']
 
@@ -83,9 +72,6 @@ class Player:
 
     def show_player_data(self):
         print(" Name :: ", self.name)
-        print(" Rating :: ", self.rating)
-        print(" Level :: ", self.level)
-        print(" Money :: ", self.money)
         print(" Inventory :: ", self.inventory)
 
     def hide(self, prev_x, prev_y):
@@ -112,7 +98,7 @@ class Player:
 
     def draw(self, win):
         if world.focused:
-            world.draw(self, charecters_switch_buttons)
+            world.draw()
             screen.blit(self.img, self.rect)
             self.draw_hp()
 
@@ -168,77 +154,16 @@ class Player:
                 mob.hp -= player.damage
 
 
-
-class  Mob(Player):
-
-    def __init__(self, hp = 10, damage = 1000, speed=0):
-        super(Mob, self).__init__(self)
-        self.hp = random.randint(1000, 18000)
-        self.damage = damage
-        self.x = random.randint(0, world.w-1)
-        self.y = random.randint(0, world.h-1)
-        self.chosen_charecter = Charecter(-1, '', '', 0, self.hp, self.damage)
-
-        self.img = pygame.image.load('images/Mob.png')
-        self.size = (30, 50)
-        self.img = pygame.transform.scale(self.img, (self.size[0], self.size[1]))
-        self.rect = self.img.get_rect(
-            center=(self.x, self.y)
-        )
-
-        self.speed = speed
-
-    def follow_player(self):
-        if world.focused and not self.rect.colliderect(player.rect):
-            self.hide(self.x, self.y)
-
-            self.velX = 0
-            self.velY = 0
-
-            sign_x = 1 if player.x - self.x > 0 else -1
-            sign_y = 1 if player.y - self.y > 0 else -1
-
-            prev_x = self.x
-            prev_y = self.y
-
-            self.velX += self.speed*sign_x
-            self.velY -= self.speed*sign_y
-
-            self.x += self.velX
-            self.y -= self.velY
-
-            moving_right = self.x - prev_x > 0 and not self.scaled
-            moving_left = self.x - prev_x < 0 and self.scaled
-
-            if moving_right:
-                self.img = pygame.transform.flip(self.img, True, False)
-                self.scaled = True
-
-            if moving_left:
-                self.img = pygame.transform.flip(self.img, True, False)
-                self.scaled = False
-
-            self.rect = self.img.get_rect(
-                center=(self.x, self.y)
-            )
-            self.draw(screen)
-        self.attack()
-
-    def attack(self):
-        if self.rect.colliderect(player.rect):
-            player.hp -= mob.damage
-
-
 class Charecter:
 
-    def __init__(self, id=-1, name='', history='', rarity=0, hp=10, damage=10):
+    def __init__(self, id = -1, name = '', history = '', rarity = 0, hp = 0, damage = 0, speed = 1):
         self.id = id
         self.name = name
         self.history = history
         self.rarity = rarity
         self.hp = hp
         self.damage = damage
-        self.speed = 4
+        self.speed = speed
         self.img = ''
 
     def save_data(self):
@@ -282,6 +207,70 @@ class Charecter:
             "hp":self.hp,
             "damage":self.damage
         })
+
+
+class  Mob(Player):
+
+    def __init__(self):
+        super(Mob, self).__init__(self)
+        self.chosen_charecter = Charecter(-1, '', '', 0,
+                                          random.randint(1000, 18000),#hp
+                                          random.randint(1, 2),#damage
+                                          random.randint(1, 3))#speed
+        self.hp = self.chosen_charecter.hp
+        self.damage = self.chosen_charecter.damage
+        self.x = random.randint(0, world.w-1)
+        self.y = random.randint(0, world.h-1)
+
+        self.img = pygame.image.load('images/Mob.png')
+        self.size = (30, 50)
+        self.img = pygame.transform.scale(self.img, (self.size[0], self.size[1]))
+        self.rect = self.img.get_rect(
+            center=(self.x, self.y)
+        )
+
+        self.speed = self.chosen_charecter.speed
+
+
+    def follow_player(self):
+        if world.focused and not self.rect.colliderect(player.rect):
+            self.hide(self.x, self.y)
+
+            self.velX = 0
+            self.velY = 0
+
+            sign_x = 1 if player.x - self.x > 0 else -1
+            sign_y = 1 if player.y - self.y > 0 else -1
+
+            prev_x = self.x
+            prev_y = self.y
+
+            self.velX += self.speed*sign_x
+            self.velY -= self.speed*sign_y
+
+            self.x += self.velX
+            self.y -= self.velY
+
+            moving_right = self.x - prev_x > 0 and not self.scaled
+            moving_left = self.x - prev_x < 0 and self.scaled
+
+            if moving_right:
+                self.img = pygame.transform.flip(self.img, True, False)
+                self.scaled = True
+
+            if moving_left:
+                self.img = pygame.transform.flip(self.img, True, False)
+                self.scaled = False
+
+            self.rect = self.img.get_rect(
+                center=(self.x, self.y)
+            )
+            self.draw(screen)
+        self.attack()
+
+    def attack(self):
+        if self.rect.colliderect(player.rect):
+            player.hp -= mob.damage
 
 
 class WheelOfLuck:
@@ -437,34 +426,54 @@ class Button:
 
 class World:
 
-    def __init__(self, w = 1000, h = 400):
+    def __init__(self, player, charecters, w = 1000, h = 400):
         self.focused = False
+        self.player = player
+        self.charecters = charecters
         self.w = w
         self.h = h
         self.spawnd_delay = 0.3
+        self.charecters_switch_buttons = []
+        self.names_of_existing = []
+        self.tmp_charecters = [charecters[charecter_id] for charecter_id in self.player.inventory]
+
+        for player_charecter_id in player.inventory:
+            for charecter_id, charecter_name in [(charecter.id, charecter.name) for charecter in charecters]:
+                if charecter_id == player_charecter_id:
+                    self.names_of_existing.append(charecter_name)
+        for button_number, button_text in list(zip(range(len(self.names_of_existing)), self.names_of_existing)):
+            self.charecters_switch_buttons.append(Button(0.1 + 0.1 * button_number, 0.9, button_text, True, 15))
 
     def draw_border(self):
         pygame.draw.rect(screen, (255, 255, 255), (0, 0, self.w, self.h), 1)
 
-    def draw_items(self, items):
-        for item in items:
-            item.draw()
+    def draw_charecters_switch_buttons(self):
+        for charecter_switch_button in self.charecters_switch_buttons:
+            charecter_switch_button.draw()
 
-    def draw(self, player, items):
+    def draw(self):
         self.focused = True
         self.draw_border()
-        self.draw_items(items)
+        self.draw_charecters_switch_buttons()
 
-    def hide(self, items):
+    def hide(self):
         self.focused = False
         screen.fill((90, 90, 90))
-        for item in items:
-            item.hide()
+        for charecter_switch_button in self.charecters_switch_buttons:
+            charecter_switch_button.hide()
 
     def spawn_mobs(self, mobs, max_mobs):
         while world.focused:
             time.sleep(self.spawnd_delay)
-            mobs.append(Mob(1, 1, random.uniform(0.25, player.speed - 1 )))
+            mobs.append(Mob())
+
+    def check_swith_buttons(self):
+        for button in self.charecters_switch_buttons:
+            if button.clicked():
+                prev_charecter = self.player.chosen_charecter
+                current_charecter = list(filter(lambda charecter:charecter.name == button.text, self.tmp_charecters))[0]
+                self.player.set_charecter(current_charecter)
+
 
 
 width = 1200
@@ -483,7 +492,7 @@ player.open_data('Akira')
 player.set_charecter(charecters[player.inventory[0]])
 player.show_player_data()
 
-world = World()
+world = World(player, charecters)
 mobs = []
 
 wheel = WheelOfLuck(screen, charecters, height/2, 175)
@@ -500,15 +509,6 @@ show_wheel_button.draw()
 play_button = Button(0.5, 0.43, 'PLAY', True)
 play_button.draw()
 
-charecters_switch_buttons = []
-names_of_existing = []
-tmp_charecters = []
-for player_charecter_id in player.inventory:
-    for charecter_id, charecter_name in [(charecter.id, charecter.name) for charecter in charecters]:
-        if charecter_id == player_charecter_id:
-            names_of_existing.append(charecter_name)
-for button_number, button_text in list(zip(range(len(names_of_existing)), names_of_existing)):
-    charecters_switch_buttons.append(Button(0.1 + 0.1*button_number, 0.9, button_text, True, 15))
 
 spin_coast = 10
 
@@ -551,7 +551,7 @@ while True:
             if spin_button.clicked():
                 threading.Thread(target=wheel.spin_wheel, args=(player,)).start()
                 spin_button.hide()
-                player.can_spin = True
+                player.can_spin = False
                 player.save_data()
 
             if exit_button.clicked():
@@ -571,8 +571,7 @@ while True:
                 player.x = 50
                 player.y = 50
                 screen.fill((90, 90, 90))
-                world.hide(charecters_switch_buttons)
-                spin_button.hide()
+                world.hide()
                 wheel.hide()
                 back_menu_button.hide()
                 show_wheel_button.draw()
@@ -580,6 +579,7 @@ while True:
                 exit_button.draw()
 
             if play_button.clicked():
+                spin_button
                 prev_kill_count = player.kill_count
                 print(player.inventory)
                 charecters = [Charecter().open_data(i) for i in range(7)]
@@ -591,28 +591,20 @@ while True:
                 show_wheel_button.hide()
                 back_menu_button.draw()
                 exit_button.draw()
-                world.draw(player, charecters_switch_buttons)
+                world.draw()
                 mobs_spawning.start()
 
-            for button in charecters_switch_buttons:
-                if button.clicked():
-                    for charecter in tmp_charecters:
-                        if charecter.name == player.chosen_charecter.name:
-                            charecter.hp = player.hp
-                    for charecter in tmp_charecters:
-                        if charecter.name == button.text:
-                            player.set_charecter(charecter)
+            world.check_swith_buttons()
 
     if world.focused:
         for mob in mobs:
-            print(player.hp)
             if player.hp < 0:
                 player.save_data()
                 player.x = 50
                 player.y = 50
                 screen.fill((90, 90, 90))
                 player.hp = player.chosen_charecter.hp
-                world.hide(charecters_switch_buttons)
+                world.hide()
                 back_menu_button.hide()
                 show_wheel_button.draw()
                 play_button.draw()
